@@ -163,11 +163,22 @@ export const spots: Spot[] = [
 ];
 
 /** タグに「雨OK」「屋内」を含むスポットは雨の日でも可 */
-export function filterByWeather(weather: "sunny" | "rainy"): Spot[] {
-  if (weather === "sunny") return spots;
-  return spots.filter(
+export function filterByRainy(arr: Spot[]): Spot[] {
+  return arr.filter(
     (s) => s.tags.includes("雨OK") || s.tags.includes("屋内")
   );
+}
+
+/** time 文字列の最小分数を返す（"半日" / "日" は 999 扱い） */
+function parseMinMinutes(time: string): number {
+  if (time.includes("半日") || time.includes("日")) return 999;
+  const match = time.match(/\d+/);
+  return match ? parseInt(match[0]) : 999;
+}
+
+/** 滞在時間の最小値が maxMinutes 以下のスポットに絞る */
+export function filterByTime(arr: Spot[], maxMinutes: number): Spot[] {
+  return arr.filter((s) => parseMinMinutes(s.time) <= maxMinutes);
 }
 
 /** 配列をシャッフルして先頭 n 件を返す */

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { spots, filterByWeather, pickRandom, type Spot } from "./data";
+import { spots, filterByRainy, filterByTime, pickRandom, type Spot } from "./data";
 
-type Weather = "sunny" | "rainy";
+type TimeLimit = 30 | 60 | null;
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ function SpotCard({ spot, rank }: { spot: Spot; rank: number }) {
           <circle cx="12" cy="12" r="10" />
           <path strokeLinecap="round" d="M12 6v6l4 2" />
         </svg>
-        移動 {spot.time}
+        滞在 {spot.time}
       </div>
 
       {/* station */}
@@ -66,18 +66,37 @@ function SpotCard({ spot, rank }: { spot: Spot; rank: number }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [weather, setWeather] = useState<Weather | null>(null);
+  const [rainy, setRainy] = useState(false);
+  const [timeLimit, setTimeLimit] = useState<TimeLimit>(null);
   const [results, setResults] = useState<Spot[] | null>(null);
 
+  const buildPool = (rainyOverride?: boolean) => {
+    let pool = rainyOverride ?? rainy ? filterByRainy(spots) : spots;
+    if (timeLimit !== null) pool = filterByTime(pool, timeLimit);
+    return pool;
+  };
+
+  const handleQuickSearch = () => {
+    setRainy(false);
+    setTimeLimit(null);
+    setResults(pickRandom(spots, 3));
+  };
+
   const handleSearch = () => {
-    const pool = weather ? filterByWeather(weather) : spots;
-    setResults(pickRandom(pool, 3));
+    setResults(pickRandom(buildPool(), 3));
   };
 
   const handleReset = () => {
-    setWeather(null);
+    setRainy(false);
+    setTimeLimit(null);
     setResults(null);
   };
+
+  const timeLimits: { label: string; value: TimeLimit }[] = [
+    { label: "30分以内", value: 30 },
+    { label: "60分以内", value: 60 },
+    { label: "制限なし", value: null },
+  ];
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -91,38 +110,60 @@ export default function Home() {
           <p className="text-sm text-gray-400 mt-1">東京エリア · 3件提案</p>
         </div>
 
-        {/* Weather selector */}
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-          今日の天気
-        </p>
-        <div className="flex gap-3 mb-6">
-          {(["sunny", "rainy"] as Weather[]).map((w) => {
-            const label = w === "sunny" ? "☀️　晴れ" : "🌧️　雨";
-            const active = weather === w;
-            return (
-              <button
-                key={w}
-                onClick={() => { setWeather(w); setResults(null); }}
-                className={`flex-1 py-3 rounded-xl text-sm font-medium border-2 transition-all ${
-                  active
-                    ? "border-green-500 bg-green-500 text-white"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-green-300"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
+        {/* ① 今日のおすすめ */}
+        <button
+          onClick={handleQuickSearch}
+          className="w-full py-4 rounded-xl bg-amber-400 text-white font-bold text-base shadow-sm active:scale-95 transition-transform hover:bg-amber-500 mb-6"
+        >
+          ⚡ 今日のおすすめ
+        </button>
+
+        {/* divider */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">条件で絞って探す</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* ② 雨の日モード toggle */}
+        <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3 mb-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🌧️</span>
+            <span className="text-sm font-medium text-gray-700">雨の日モード</span>
+            <span className="text-xs text-gray-400">（屋内 · 雨OKのみ）</span>
+          </div>
           <button
-            onClick={() => { setWeather(null); setResults(null); }}
-            className={`px-3 py-3 rounded-xl text-sm border-2 transition-all ${
-              weather === null
-                ? "border-green-500 bg-green-500 text-white"
-                : "border-gray-200 bg-white text-gray-400 hover:border-green-300"
+            onClick={() => { setRainy(!rainy); setResults(null); }}
+            className={`relative w-12 h-6 rounded-full transition-colors ${
+              rainy ? "bg-blue-500" : "bg-gray-300"
             }`}
           >
-            どちらでも
+            <span
+              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                rainy ? "translate-x-6" : "translate-x-0.5"
+              }`}
+            />
           </button>
+        </div>
+
+        {/* ③ 時間フィルター */}
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+          滞在時間のめやす
+        </p>
+        <div className="flex gap-2 mb-6">
+          {timeLimits.map(({ label, value }) => (
+            <button
+              key={String(value)}
+              onClick={() => { setTimeLimit(value); setResults(null); }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
+                timeLimit === value
+                  ? "border-green-500 bg-green-500 text-white"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-green-300"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Search button */}
@@ -138,7 +179,7 @@ export default function Home() {
           <div className="mt-8">
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm font-bold text-gray-700">
-                {results.length > 0 ? "おすすめ 3 件" : "見つかりませんでした"}
+                {results.length > 0 ? "おすすめ 3 件" : "条件に合うスポットがありません"}
               </p>
               <button
                 onClick={handleReset}
@@ -148,24 +189,27 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="space-y-4">
-              {results.map((spot, i) => (
-                <SpotCard key={spot.name} spot={spot} rank={i + 1} />
-              ))}
-            </div>
+            {results.length > 0 && (
+              <>
+                <div className="space-y-4">
+                  {results.map((spot, i) => (
+                    <SpotCard key={spot.name} spot={spot} rank={i + 1} />
+                  ))}
+                </div>
 
-            {/* Re-search */}
-            <button
-              onClick={handleSearch}
-              className="w-full mt-5 py-3 rounded-xl border-2 border-green-400 text-green-600 font-medium text-sm hover:bg-green-50 transition-colors"
-            >
-              🔄　別の3件を見る
-            </button>
+                <button
+                  onClick={handleSearch}
+                  className="w-full mt-5 py-3 rounded-xl border-2 border-green-400 text-green-600 font-medium text-sm hover:bg-green-50 transition-colors"
+                >
+                  🔄　別の3件を見る
+                </button>
+              </>
+            )}
           </div>
         )}
 
         <p className="text-center text-xs text-gray-300 mt-10">
-          ※ 移動時間は目安です
+          ※ 滞在時間は目安です
         </p>
       </div>
     </main>
